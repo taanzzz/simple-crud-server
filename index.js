@@ -28,7 +28,6 @@ async function run() {
     const db = client.db('plantCareDB');
     plantCollection = db.collection('plants');
 
-    // Routes
     app.get('/', (req, res) => {
       res.send('🌱 Plant Care Tracker Server is Running!');
     });
@@ -53,8 +52,7 @@ async function run() {
 
     app.get('/plants/:id', async (req, res) => {
       try {
-        const id = req.params.id;
-        const plant = await plantCollection.findOne({ _id: new ObjectId(id) });
+        const plant = await plantCollection.findOne({ _id: new ObjectId(req.params.id) });
         res.send(plant);
       } catch (err) {
         res.status(500).send({ error: 'Failed to get plant' });
@@ -98,12 +96,13 @@ async function run() {
       }
     });
 
-    // ✅ This runs only locally, NOT on Vercel
+    // ✅ Only run locally
     if (process.env.NODE_ENV !== 'production') {
       app.listen(port, () => {
         console.log(`🚀 Server running at http://localhost:${port}`);
       });
     }
+
   } catch (err) {
     console.error('❌ Failed to start server:', err);
   }
@@ -111,5 +110,5 @@ async function run() {
 
 run();
 
-// ✅ Vercel needs this to export the app
+// ✅ ✅ ✅ Required for Vercel
 module.exports = app;
