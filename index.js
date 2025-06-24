@@ -4,10 +4,11 @@ const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const app = express();
-const port = process.env.PORT || 3000; // Keep for local testing if needed
+const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+
 
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri, {
@@ -15,74 +16,77 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  },
+  }
 });
 
-let plantCollection; // Declare it here
+let plantCollection;
 
-// Connect to MongoDB and set up routes inside an async function
-async function initializeApp() {
+async function run() {
   try {
     await client.connect();
-    console.log('✅ MongoDB Connected');
+    console.log('MongoDB Connected');
 
     const db = client.db('plantCareDB');
     plantCollection = db.collection('plants');
 
-    // Define all your routes AFTER MongoDB is connected and collection is ready
+    
     app.get('/', (req, res) => {
-      res.send('🌱 Plant Care Tracker Server is Running!');
+      res.send('🌱Plant Care Tracker Server is Running!');
     });
 
+    
     app.post('/plants', async (req, res) => {
       try {
-        const result = await plantCollection.insertOne(req.body);
+        const plant = req.body;
+        const result = await plantCollection.insertOne(plant);
         res.send(result);
       } catch (err) {
-        console.error("Error adding plant:", err); // Log error for debugging
-        res.status(500).send({ error: 'Failed to add plant', details: err.message });
+        console.error('POST /plants error:', err);
+        res.status(500).send({ error: 'Failed to add plant' });
       }
     });
 
+    
     app.get('/plants', async (req, res) => {
       try {
         const plants = await plantCollection.find().toArray();
         res.send(plants);
       } catch (err) {
-        console.error("Error fetching plants:", err);
-        res.status(500).send({ error: 'Failed to fetch plants', details: err.message });
+        console.error('GET /plants error:', err);
+        res.status(500).send({ error: 'Failed to fetch plants' });
       }
     });
 
+    
     app.get('/plants/:id', async (req, res) => {
       try {
-        const plant = await plantCollection.findOne({ _id: new ObjectId(req.params.id) });
-        if (!plant) {
-          return res.status(404).send({ error: 'Plant not found' });
-        }
+        const id = req.params.id;
+        const plant = await plantCollection.findOne({ _id: new ObjectId(id) });
         res.send(plant);
       } catch (err) {
-        console.error("Error getting plant by ID:", err);
-        res.status(500).send({ error: 'Failed to get plant', details: err.message });
+        console.error('GET /plants/:id error:', err);
+        res.status(500).send({ error: 'Failed to get plant' });
       }
     });
 
+    
     app.get('/my-plants/:email', async (req, res) => {
       try {
         const email = req.params.email;
         const userPlants = await plantCollection.find({ userEmail: email }).toArray();
         res.send(userPlants);
       } catch (err) {
-        console.error("Error fetching user plants:", err);
-        res.status(500).send({ error: 'Failed to fetch user plants', details: err.message });
+        console.error('GET /my-plants/:email error:', err);
+        res.status(500).send({ error: 'Failed to fetch user plants' });
       }
     });
 
+   
     app.put('/plants/:id', async (req, res) => {
       try {
         const id = req.params.id;
         const updatedPlant = { ...req.body };
-        delete updatedPlant._id; // _id should not be updated
+        delete updatedPlant._id; // remove _id if present
 
         const result = await plantCollection.updateOne(
           { _id: new ObjectId(id) },
@@ -90,49 +94,36 @@ async function initializeApp() {
         );
 
         if (result.matchedCount === 0) {
-            return res.status(404).send({ error: 'Plant not found for update' });
+          return res.status(404).send({ error: 'Plant not found' });
         }
-        res.send({ message: 'Updated', result });
+
+        res.send({ message: 'Plant updated successfully', modifiedCount: result.modifiedCount });
       } catch (err) {
-        console.error("Error updating plant:", err);
-        res.status(500).send({ error: 'Failed to update plant', details: err.message });
+        console.error('❌ PUT /plants/:id error:', err);
+        res.status(500).send({ error: 'Failed to update plant' });
       }
     });
 
+    
     app.delete('/plants/:id', async (req, res) => {
       try {
         const id = req.params.id;
         const result = await plantCollection.deleteOne({ _id: new ObjectId(id) });
-        if (result.deletedCount === 0) {
-            return res.status(404).send({ error: 'Plant not found for deletion' });
-        }
         res.send(result);
       } catch (err) {
-        console.error("Error deleting plant:", err);
-        res.status(500).send({ error: 'Failed to delete plant', details: err.message });
+        console.error('❌ DELETE /plants/:id error:', err);
+        res.status(500).send({ error: 'Failed to delete plant' });
       }
     });
 
-    // Local testing only
-    if (process.env.NODE_ENV !== 'production') {
-      app.listen(port, () => {
-        console.log(`🚀 Server running at http://localhost:${port}`);
-      });
-    }
+   
+    app.listen(port, () => {
+      console.log(`🚀 Server running at http://localhost:${port}`);
+    });
 
   } catch (err) {
-    console.error('❌ Failed to initialize app:', err);
-    // Exit process or handle error appropriately if connection fails
-    process.exit(1); // Exit if cannot connect to DB
+    console.error('❌ Failed to start server:', err);
   }
 }
 
-// Call the initialization function immediately
-initializeApp();
-
-// Export the app. Vercel will wait for the async initialization to complete
-// if you configure it correctly, or more reliably, use a serverless function
-// that directly handles the request and calls the initialized app.
-// For a simple Express app, Vercel will often "warm up" the function by
-// calling it once, which will trigger initializeApp().
-module.exports = app;
+run();
